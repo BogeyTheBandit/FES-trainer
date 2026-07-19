@@ -1,0 +1,12 @@
+{
+  "name": "FES Instructor I Adaptive Trainer",
+  "short_name": "FES Trainer",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#16181B",
+  "theme_color": "#16181B",
+  "icons": [
+    { "src": "icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
