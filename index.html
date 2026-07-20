@@ -339,10 +339,95 @@ function tone(freq, dur, delay, type, vol) {
     o.start(t); o.stop(t + dur + 0.05);
   } catch (e) {}
 }
-function sndCorrect(combo) { tone(660 + Math.min(combo, 6) * 60, 0.12, 0, "sine"); tone(880 + Math.min(combo, 6) * 60, 0.14, 0.08, "sine"); }
-function sndWrong() { tone(160, 0.22, 0, "square", 0.06); }
-function sndJackpot() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.16, i * 0.07, "triangle", 0.14)); }
-function sndRankUp() { [392, 523, 659, 784].forEach((f, i) => tone(f, 0.22, i * 0.12, "sine", 0.14)); }
+/* ---- synth toolkit ---- */
+function slideTone(f0, f1, dur, delay, type, vol) {
+  if (db.mute) return;
+  try {
+    ensureAC(); if (AC.state === "suspended") return;
+    const t = AC.currentTime + (delay || 0);
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || "sine";
+    o.frequency.setValueAtTime(f0, t);
+    o.frequency.exponentialRampToValueAtTime(Math.max(f1, 30), t + dur);
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol || 0.1, t + 0.02);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  } catch (e) {}
+}
+function noiseBurst(dur, delay, fStart, fEnd, vol) {
+  if (db.mute) return;
+  try {
+    ensureAC(); if (AC.state === "suspended") return;
+    const t = AC.currentTime + (delay || 0);
+    const len = Math.max(1, Math.floor(AC.sampleRate * dur));
+    const buf = AC.createBuffer(1, len, AC.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    const src = AC.createBufferSource(); src.buffer = buf;
+    const f = AC.createBiquadFilter(); f.type = "lowpass";
+    f.frequency.setValueAtTime(fStart || 3000, t);
+    f.frequency.exponentialRampToValueAtTime(Math.max(fEnd || 200, 40), t + dur);
+    const g = AC.createGain();
+    g.gain.setValueAtTime(vol || 0.25, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(f); f.connect(g); g.connect(AC.destination);
+    src.start(t); src.stop(t + dur + 0.05);
+  } catch (e) {}
+}
+function boom(delay, size) {
+  noiseBurst(0.5 * size, delay, 900, 60, 0.3);
+  slideTone(150, 40, 0.5 * size, delay, "sine", 0.25); // sub drop
+}
+function crackle(delay, n) {
+  for (let i = 0; i < n; i++) noiseBurst(0.04, delay + Math.random() * 0.5, 6000, 2500, 0.08);
+}
+function fireworks(delay, big) {
+  slideTone(500, 1800, 0.5, delay, "sine", 0.06);          // whistle up
+  boom(delay + 0.5, big ? 1.3 : 0.9);                       // explosion
+  crackle(delay + 0.55, big ? 12 : 7);                      // sparkle crackle
+  [1319, 1568, 2093].forEach((f, i) => tone(f, 0.25, delay + 0.6 + i * 0.09, "triangle", 0.07));
+}
+/* ---- musical combo ladder: each correct climbs a major scale ---- */
+const SCALE = [523, 587, 659, 698, 784, 880, 988, 1047, 1175, 1319, 1397, 1568];
+function sndCorrect(combo) {
+  const step = Math.min(combo - 1, SCALE.length - 1);
+  const f = SCALE[step];
+  tone(f, 0.13, 0, "sine", 0.13);
+  tone(f * 1.5, 0.15, 0.07, "sine", 0.08);
+  if (combo === 2) {            // x2 flourish
+    tone(784, 0.1, 0.16, "triangle", 0.1); tone(1047, 0.16, 0.24, "triangle", 0.12);
+  } else if (combo === 5) {     // x3 arpeggio
+    [784, 988, 1175, 1568].forEach((n, i) => tone(n, 0.14, 0.16 + i * 0.07, "triangle", 0.12));
+  } else if (combo === 8) {     // x4 climax: chord blast + shimmer riser
+    [523, 659, 784, 1047].forEach(n => tone(n, 0.5, 0.16, "sawtooth", 0.05));
+    slideTone(1047, 2093, 0.5, 0.2, "sine", 0.07);
+    crackle(0.3, 6);
+  } else if (combo > 8) {       // riding the max combo: shimmer layer on every hit
+    tone(f * 2, 0.2, 0.1, "triangle", 0.06);
+    crackle(0.12, 2);
+  }
+}
+function sndWrong() { tone(160, 0.22, 0, "square", 0.06); tone(110, 0.3, 0.1, "square", 0.05); }
+function sndJackpot() {
+  fireworks(0, false);
+  [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.16, 1.0 + i * 0.07, "triangle", 0.13));
+}
+function sndRankUp() {
+  // layered fanfare: detuned saws, then fireworks
+  const prog = [[392, 494, 587], [440, 554, 659], [494, 622, 740], [587, 740, 880]];
+  prog.forEach((chord, ci) => chord.forEach(f => {
+    tone(f, 0.3, ci * 0.18, "sawtooth", 0.05);
+    tone(f * 1.005, 0.3, ci * 0.18, "sawtooth", 0.04);
+  }));
+  fireworks(0.75, true);
+}
+function sndExamPass() {
+  sndRankUp();
+  fireworks(1.6, true);
+  fireworks(2.3, false);
+}
 function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
 
 function toggleMute() {
@@ -731,6 +816,7 @@ function answer(qi, oi, btn) {
     const justMastered = s.s === MASTER_STREAK;
     if (justMastered) gained += 50;
     if (jack) { sndJackpot(); confetti(45); buzz([40, 30, 80]); } else { sndCorrect(session.combo); buzz(20); }
+    if (justMastered && !jack) fireworks(0.2, false);
     awardXP(gained, rect.left + rect.width / 2, rect.top, jack);
     if (justMastered) { confetti(60); banner("MASTERED", "3 in a row. +50 XP bonus. It stays mastered until it beats you."); }
     fb.innerHTML = '<div class="feedback good"><strong>Correct' + (mult > 1 ? ' — combo ×' + mult : '') + (jack ? ' — JACKPOT ×3' : '') + '.</strong> ' + q.r + (justMastered ? ' <strong>Streak of ' + MASTER_STREAK + ' — mastered.</strong>' : ' Next review in ' + s.iv + ' day' + (s.iv === 1 ? '' : 's') + '.') + '</div>';
@@ -797,7 +883,7 @@ function finish() {
     let bonus = 20;
     if (pctNow >= 85) bonus += 30;
     if (firstToday) bonus += 100;
-    if (session.mode === "exam" && pctNow >= 70) { bonus += 200; confetti(140); sndRankUp(); banner("EXAM PASSED — " + pctNow + "%", "+200 XP. That's what test day is going to feel like."); }
+    if (session.mode === "exam" && pctNow >= 70) { bonus += 200; confetti(140); sndExamPass(); banner("EXAM PASSED — " + pctNow + "%", "+200 XP. That's what test day is going to feel like."); }
     else if (pctNow >= 85) { confetti(70); banner("STRONG SESSION — " + pctNow + "%", firstToday ? "+" + bonus + " XP including daily bonus" : "+" + bonus + " XP"); }
     else if (firstToday) banner("DAILY BONUS", "+100 XP for showing up. The streak is the real win.");
     awardXP(bonus, window.innerWidth / 2, window.innerHeight * 0.35, false);
