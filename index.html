@@ -89,7 +89,27 @@
   .streakflame { color: var(--trim); }
   textarea { width: 100%; height: 90px; background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 10px; font-family: monospace; font-size: 12px; }
   @media (max-width: 500px) { .chname { width: 96px; font-size: 11px; } .gauge-card { gap: 12px; } }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+  /* ===== v3 dopamine layer ===== */
+  .rankbar { height: 8px; background: var(--panel-2); border-radius: 4px; overflow: hidden; margin-top: 6px; }
+  .rankbar > div { height: 100%; background: linear-gradient(90deg, var(--trim), #FFD84D); border-radius: 4px; transition: width 0.6s cubic-bezier(.2,.8,.2,1); }
+  .combo { font-family: 'Oswald', sans-serif; font-size: 15px; padding: 3px 10px; border-radius: 6px; background: var(--panel-2); color: var(--dim); transition: all 0.2s; }
+  .combo.c2 { color: var(--trim); border: 1px solid var(--trim); }
+  .combo.c3 { color: #FF9F1C; border: 1px solid #FF9F1C; background: #3A2A08; }
+  .combo.c4 { color: #FF5714; border: 1px solid #FF5714; background: #3A1A08; animation: comboPulse 0.8s infinite alternate; }
+  @keyframes comboPulse { from { box-shadow: 0 0 4px #FF571466; } to { box-shadow: 0 0 14px #FF5714AA; } }
+  .xp-pop { position: fixed; font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 22px; color: var(--trim); pointer-events: none; z-index: 90; animation: xpFloat 1.1s ease-out forwards; text-shadow: 0 2px 8px #000; }
+  .xp-pop.jack { font-size: 30px; color: #FFD84D; }
+  @keyframes xpFloat { 0% { opacity: 0; transform: translateY(8px) scale(0.8); } 15% { opacity: 1; transform: translateY(0) scale(1.15); } 100% { opacity: 0; transform: translateY(-46px) scale(1); } }
+  .banner { position: fixed; top: 18%; left: 50%; transform: translateX(-50%) scale(0.7); z-index: 95; background: var(--panel); border: 2px solid var(--trim); border-radius: 14px; padding: 18px 30px; text-align: center; opacity: 0; pointer-events: none; box-shadow: 0 8px 40px #000C; animation: bannerIn 1.9s ease forwards; }
+  .banner .b-top { font-family: 'Oswald', sans-serif; font-size: 26px; color: var(--trim); letter-spacing: 0.06em; text-transform: uppercase; }
+  .banner .b-sub { font-size: 13px; color: var(--dim); margin-top: 4px; }
+  @keyframes bannerIn { 0% { opacity: 0; transform: translateX(-50%) scale(0.7); } 12% { opacity: 1; transform: translateX(-50%) scale(1.05); } 18% { transform: translateX(-50%) scale(1); } 82% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) scale(0.95); } }
+  .confetti-piece { position: fixed; width: 9px; height: 14px; z-index: 94; pointer-events: none; animation: confFall linear forwards; }
+  @keyframes confFall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(105vh) rotate(720deg); opacity: 0.6; } }
+  .mutebtn { padding: 6px 10px; font-size: 14px; border-radius: 6px; }
+  .shake { animation: shakeX 0.3s; }
+  @keyframes shakeX { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 </style>
 </head>
 <body>
@@ -97,9 +117,20 @@
 
   <!-- ============ HOME ============ -->
   <div id="home">
-    <h1>FES Instructor I <span style="color:var(--red)">Trainer</span> <span style="font-size:13px; color:var(--dim); letter-spacing:0.06em;">V2</span></h1>
-    <div class="sub">NFPA 1041 · Chapters 1–8 · 120 questions · Spaced repetition, exam sim, and a memory that never quits</div>
+    <h1 style="display:flex; align-items:center; justify-content:space-between;"><span>FES Instructor I <span style="color:var(--red)">Trainer</span> <span style="font-size:13px; color:var(--dim); letter-spacing:0.06em;">V3</span></span><button class="mutebtn" id="mutebtn" onclick="toggleMute()" aria-label="Toggle sound">🔊</button></h1>
+    <div class="sub">NFPA 1041 · Chapters 1–8 · 120 questions · Now with a reward engine tuned to keep you coming back</div>
     <div class="trimbar"></div>
+
+    <div class="card" style="display:flex; align-items:center; gap:16px;">
+      <div class="disp" style="font-size:34px; color:var(--trim);" id="rank-icon">▮</div>
+      <div style="flex:1;">
+        <div style="display:flex; justify-content:space-between; align-items:baseline; flex-wrap:wrap; gap:6px;">
+          <div class="disp" style="font-size:18px;" id="rank-name">Probie</div>
+          <div style="font-size:12px; color:var(--dim);"><span id="xp-now">0</span> XP<span id="xp-next"></span></div>
+        </div>
+        <div class="rankbar"><div id="rank-prog" style="width:0%"></div></div>
+      </div>
+    </div>
 
     <div class="card gauge-card">
       <div class="gauge" id="gauge"><div class="inner"><div class="pct" id="g-pct">—</div><div class="glbl">Exam ready</div></div></div>
@@ -189,6 +220,7 @@
       <span class="disp" id="q-count" style="font-size:15px;"></span>
       <div class="prog"><div id="q-prog" style="width:0%"></div></div>
       <span id="q-score"></span>
+      <span class="combo hidden" id="q-combo"></span>
       <span class="timer hidden" id="q-timer"></span>
       <button onclick="endEarly()" style="padding:6px 12px; font-size:12px;">End</button>
     </div>
@@ -258,9 +290,106 @@ const MASTER_STREAK = 3;
 const DAY = 86400000;
 const INTERVALS = [1, 2, 5, 12, 30];
 
-let db = { q: {}, hist: [] };
+let db = { q: {}, hist: [], xp: 0, mute: false };
 let storageOK = true;
 let session = null;
+
+/* ===== v3 reward engine ===== */
+const RANKS = [
+  ["Probie", 0], ["Firefighter", 300], ["Driver / Engineer", 800], ["Lieutenant", 1600],
+  ["Captain", 2800], ["Battalion Chief", 4400], ["Training Officer", 6500], ["Chief Instructor", 9000]
+];
+const JACKPOT_CHANCE = 0.06;
+
+let AC = null;
+function tone(freq, dur, delay, type, vol) {
+  if (db.mute) return;
+  try {
+    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    const t = AC.currentTime + (delay || 0);
+    const o = AC.createOscillator(), g = AC.createGain();
+    o.type = type || "sine"; o.frequency.value = freq;
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(vol || 0.12, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    o.connect(g); g.connect(AC.destination);
+    o.start(t); o.stop(t + dur + 0.05);
+  } catch (e) {}
+}
+function sndCorrect(combo) { tone(660 + Math.min(combo, 6) * 60, 0.12, 0, "sine"); tone(880 + Math.min(combo, 6) * 60, 0.14, 0.08, "sine"); }
+function sndWrong() { tone(160, 0.22, 0, "square", 0.06); }
+function sndJackpot() { [523, 659, 784, 1047, 1319].forEach((f, i) => tone(f, 0.16, i * 0.07, "triangle", 0.14)); }
+function sndRankUp() { [392, 523, 659, 784].forEach((f, i) => tone(f, 0.22, i * 0.12, "sine", 0.14)); }
+function buzz(ms) { try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {} }
+
+function toggleMute() {
+  db.mute = !db.mute;
+  document.getElementById("mutebtn").textContent = db.mute ? "🔇" : "🔊";
+  saveDB();
+}
+
+function rankFor(xp) {
+  let ri = 0;
+  for (let i = 0; i < RANKS.length; i++) if (xp >= RANKS[i][1]) ri = i;
+  return ri;
+}
+
+function awardXP(amount, x, y, jack) {
+  const before = rankFor(db.xp);
+  db.xp += amount;
+  const after = rankFor(db.xp);
+  saveDB();
+  const pop = document.createElement("div");
+  pop.className = "xp-pop" + (jack ? " jack" : "");
+  pop.textContent = (jack ? "JACKPOT +" : "+") + amount + " XP";
+  pop.style.left = Math.max(10, Math.min(x - 40, window.innerWidth - 130)) + "px";
+  pop.style.top = Math.max(60, y - 30) + "px";
+  document.body.appendChild(pop);
+  setTimeout(() => pop.remove(), 1150);
+  if (after > before) rankUp(after);
+}
+
+function rankUp(ri) {
+  sndRankUp(); buzz([60, 40, 120]);
+  confetti(90);
+  banner("RANK UP: " + RANKS[ri][0], "You've been promoted. Keep climbing.");
+}
+
+function banner(top, sub) {
+  const b = document.createElement("div");
+  b.className = "banner";
+  b.innerHTML = '<div class="b-top">' + top + '</div><div class="b-sub">' + sub + '</div>';
+  document.body.appendChild(b);
+  setTimeout(() => b.remove(), 1950);
+}
+
+function confetti(n) {
+  const colors = ["#F5C518", "#D6392F", "#ECEAE4", "#4CAF6D", "#FF9F1C"];
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement("div");
+    p.className = "confetti-piece";
+    p.style.left = Math.random() * 100 + "vw";
+    p.style.background = colors[Math.floor(Math.random() * colors.length)];
+    p.style.animationDuration = (1.4 + Math.random() * 1.4) + "s";
+    p.style.animationDelay = (Math.random() * 0.3) + "s";
+    p.style.borderRadius = Math.random() > 0.5 ? "50%" : "2px";
+    document.body.appendChild(p);
+    setTimeout(() => p.remove(), 3200);
+  }
+}
+
+function updateCombo() {
+  const el = document.getElementById("q-combo");
+  const c = session ? session.combo : 0;
+  if (!el) return;
+  if (c >= 2 && session.mode !== "exam") {
+    el.classList.remove("hidden", "c2", "c3", "c4");
+    el.classList.add(c >= 8 ? "c4" : c >= 5 ? "c3" : "c2");
+    el.textContent = "COMBO ×" + comboMult(c);
+  } else el.classList.add("hidden");
+}
+function comboMult(c) { return c >= 8 ? 4 : c >= 5 ? 3 : c >= 2 ? 2 : 1; }
+/* ===== end reward engine ===== */
 
 /* ---------- storage adapter ---------- */
 const store = {
@@ -302,6 +431,8 @@ async function loadDB() {
   }
   if (!db.q) db.q = {};
   if (!db.hist) db.hist = [];
+  if (typeof db.xp !== "number") db.xp = 0;
+  if (typeof db.mute !== "boolean") db.mute = false;
   storageOK = store.mode !== "none";
 }
 
@@ -389,6 +520,14 @@ function shuffle(a) { for (let i = a.length - 1; i > 0; i--) { const j = Math.fl
 
 /* ---------- home render ---------- */
 function renderHome() {
+  const ri = rankFor(db.xp);
+  document.getElementById("rank-name").textContent = RANKS[ri][0];
+  document.getElementById("xp-now").textContent = db.xp;
+  const nxt = RANKS[ri + 1];
+  document.getElementById("xp-next").textContent = nxt ? " · " + (nxt[1] - db.xp) + " to " + nxt[0] : " · top rank";
+  const base = RANKS[ri][1], span = nxt ? nxt[1] - base : 1;
+  document.getElementById("rank-prog").style.width = nxt ? Math.min(100, Math.round((db.xp - base) / span * 100)) + "%" : "100%";
+  document.getElementById("mutebtn").textContent = db.mute ? "🔇" : "🔊";
   const r = readiness();
   const due = QUESTIONS.map((q, i) => i).filter(isDue).filter(i => !isMastered(i) || qs(i).due <= Date.now());
   const dueCount = QUESTIONS.map((q, i) => i).filter(isDue).length;
@@ -478,7 +617,7 @@ function startSession(mode) {
   else if (mode === "due") list = pool.sort((a, b) => qs(a).due - qs(b).due).slice(0, n);
   else list = pickWeighted(pool, n);
 
-  session = { mode: mode, list: list, pos: 0, right: 0, misses: [], answers: {}, endTime: mode === "exam" ? Date.now() + 120 * 60000 : null, timerId: null };
+  session = { mode: mode, list: list, pos: 0, right: 0, misses: [], answers: {}, combo: 0, endTime: mode === "exam" ? Date.now() + 120 * 60000 : null, timerId: null };
   show(mode === "flash" ? "flash" : "quiz");
   if (mode === "exam") {
     document.getElementById("q-timer").classList.remove("hidden");
@@ -557,13 +696,27 @@ function answer(qi, oi, btn) {
   buttons.forEach((b, bi) => { if (bi === q.a) b.classList.add("correct"); });
   const fb = document.getElementById("q-fb");
   const s = qs(qi);
+  const rect = btn.getBoundingClientRect();
   if (correct) {
+    session.combo++;
+    const mult = comboMult(session.combo);
+    const jack = Math.random() < JACKPOT_CHANCE;
+    let gained = 10 * mult * (jack ? 3 : 1);
     const justMastered = s.s === MASTER_STREAK;
-    fb.innerHTML = '<div class="feedback good"><strong>Correct.</strong> ' + q.r + (justMastered ? ' <strong>Streak of ' + MASTER_STREAK + ' — mastered.</strong>' : ' Next review in ' + s.iv + ' day' + (s.iv === 1 ? '' : 's') + '.') + '</div>';
+    if (justMastered) gained += 50;
+    if (jack) { sndJackpot(); confetti(45); buzz([40, 30, 80]); } else { sndCorrect(session.combo); buzz(20); }
+    awardXP(gained, rect.left + rect.width / 2, rect.top, jack);
+    if (justMastered) { confetti(60); banner("MASTERED", "3 in a row. +50 XP bonus. It stays mastered until it beats you."); }
+    fb.innerHTML = '<div class="feedback good"><strong>Correct' + (mult > 1 ? ' — combo ×' + mult : '') + (jack ? ' — JACKPOT ×3' : '') + '.</strong> ' + q.r + (justMastered ? ' <strong>Streak of ' + MASTER_STREAK + ' — mastered.</strong>' : ' Next review in ' + s.iv + ' day' + (s.iv === 1 ? '' : 's') + '.') + '</div>';
   } else {
+    session.combo = 0;
+    sndWrong(); buzz(60);
     btn.classList.add("wrong");
-    fb.innerHTML = '<div class="feedback bad"><strong>Not quite — the answer is ' + LETTERS[q.a] + '.</strong> ' + q.r + ' Back in rotation immediately.</div>';
+    document.querySelector("#quiz .card").classList.add("shake");
+    setTimeout(() => document.querySelector("#quiz .card").classList.remove("shake"), 350);
+    fb.innerHTML = '<div class="feedback bad"><strong>Not quite — the answer is ' + LETTERS[q.a] + '.</strong> ' + q.r + ' Combo lost — back in rotation immediately.</div>';
   }
+  updateCombo();
   document.getElementById("q-score").textContent = session.right + " correct";
   document.getElementById("q-next-row").classList.remove("hidden");
 }
@@ -597,7 +750,12 @@ function flashReveal() {
 function flashGrade(got) {
   const qi = session.list[session.pos];
   recordAnswer(qi, got);
-  if (got) session.right++; else session.misses.push(qi);
+  if (got) {
+    session.right++;
+    session.combo++;
+    sndCorrect(session.combo);
+    awardXP(5 * comboMult(session.combo), window.innerWidth / 2, window.innerHeight / 2, false);
+  } else { session.combo = 0; sndWrong(); session.misses.push(qi); }
   nextQ();
 }
 
@@ -605,8 +763,19 @@ function flashGrade(got) {
 function finish() {
   if (session.timerId) clearInterval(session.timerId);
   const answered = session.right + session.misses.length;
+  const firstToday = !db.hist.some(hh => new Date(hh.t).toDateString() === new Date().toDateString());
   logSession(session.mode, session.right, answered);
   show("done");
+  if (answered > 0) {
+    const pctNow = Math.round(session.right / answered * 100);
+    let bonus = 20;
+    if (pctNow >= 85) bonus += 30;
+    if (firstToday) bonus += 100;
+    if (session.mode === "exam" && pctNow >= 70) { bonus += 200; confetti(140); sndRankUp(); banner("EXAM PASSED — " + pctNow + "%", "+200 XP. That's what test day is going to feel like."); }
+    else if (pctNow >= 85) { confetti(70); banner("STRONG SESSION — " + pctNow + "%", firstToday ? "+" + bonus + " XP including daily bonus" : "+" + bonus + " XP"); }
+    else if (firstToday) banner("DAILY BONUS", "+100 XP for showing up. The streak is the real win.");
+    awardXP(bonus, window.innerWidth / 2, window.innerHeight * 0.35, false);
+  }
   const exam = session.mode === "exam";
   document.getElementById("d-title").textContent = exam ? "Exam results" : "Session complete";
   const pct = answered === 0 ? 0 : Math.round(session.right / answered * 100);
