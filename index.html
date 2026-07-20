@@ -109,6 +109,14 @@
   @keyframes confFall { 0% { transform: translateY(-20px) rotate(0deg); opacity: 1; } 100% { transform: translateY(105vh) rotate(720deg); opacity: 0.6; } }
   .mutebtn { padding: 6px 10px; font-size: 14px; border-radius: 6px; }
   .shake { animation: shakeX 0.3s; }
+  .badge { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--panel-2); text-align: left; cursor: pointer; }
+  .badge .b-name { font-family: 'Oswald', sans-serif; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--dim); }
+  .badge .b-desc { font-size: 11px; color: var(--dim); margin-top: 3px; line-height: 1.4; }
+  .badge .b-cta { font-size: 11px; margin-top: 6px; color: var(--red); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .badge.earned { border-color: var(--trim); background: #2E2708; }
+  .badge.earned .b-name { color: var(--trim); }
+  .badge.earned .b-cta { color: var(--green); }
+  .badge.locked { opacity: 0.75; }
   @keyframes shakeX { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
 </style>
 </head>
@@ -130,6 +138,15 @@
         </div>
         <div class="rankbar"><div id="rank-prog" style="width:0%"></div></div>
       </div>
+    </div>
+
+    <div class="card" style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:180px;">
+        <div style="font-size:11px; color:var(--dim); text-transform:uppercase; letter-spacing:0.06em;">Exam countdown</div>
+        <div class="disp" style="font-size:20px;" id="cd-line">Set your exam date →</div>
+        <div style="font-size:12px; color:var(--dim); margin-top:2px;" id="cd-pace"></div>
+      </div>
+      <input type="date" id="examdate" style="background:var(--panel-2); color:var(--text); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-family:'Inter',sans-serif; font-size:14px;">
     </div>
 
     <div class="card gauge-card">
@@ -179,6 +196,20 @@
       <h2>Last 12 sessions</h2>
       <div class="bars" id="trend"></div>
       <div style="font-size:11px; color:var(--dim); margin-top:6px;">Bars show session accuracy. Red = below the 70% pass line.</div>
+    </div>
+
+    <div class="card">
+      <h2>Boss battles — badge wall</h2>
+      <div style="font-size:13px; color:var(--dim); line-height:1.5; margin-bottom:10px;">Beat a chapter's boss — all 15 questions, 85% or better (13/15) — to claim its badge. Eight badges = exam ready. Bosses can be re-fought anytime; badges are forever.</div>
+      <div id="bosswall" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px;"></div>
+      <h2 style="margin-top:18px;">Achievements</h2>
+      <div id="achwall" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:10px;"></div>
+    </div>
+
+    <div class="card">
+      <h2>Weakest concepts</h2>
+      <div style="font-size:12px; color:var(--dim); margin-bottom:8px;">Your accuracy grouped by concept, not just chapter — this is what to re-study.</div>
+      <div id="concepts" style="font-size:14px; color:var(--dim);">Answer more questions to build your concept profile.</div>
     </div>
 
     <div class="card">
@@ -499,6 +530,59 @@ function updateCombo() {
 function comboMult(c) { return c >= 8 ? 4 : c >= 5 ? 3 : c >= 2 ? 2 : 1; }
 /* ===== end reward engine ===== */
 
+/* ===== V4: concept tags ===== */
+const TAGS = [
+"Instructor levels","Instructor levels","JPRs","Copyright law","Discrimination law","Disability law (ADA)","Negligence & liability","Harassment law","Role modeling","Ethics","Certification systems","NFPA standards","Copyright law","Records & confidentiality","Instructor role",
+"Laws of learning","Laws of learning","Laws of learning","Laws of learning","Laws of learning","Learning domains","Learning domains","Learning domains","Maslow & motivation","Learning styles & senses","Learning styles & senses","Adult learning","Adult learning","Learning theory","Disabilities & accommodations",
+"Four-step method","Four-step method","Four-step method","Lecture method","Demonstration & skills teaching","Discussion & facilitation","Questioning techniques","Questioning techniques","Disruptive students","Disruptive students","Classroom setup","Safety during practice","Adapting delivery","Simulation & role play","Supervision ratios",
+"Communication process","Communication process","Nonverbal communication","Listening skills","Voice & delivery","Audience analysis","Written communication","Report writing","Report writing","Communication barriers","Communication barriers","Feedback delivery","Written communication","Listening skills","Reading the audience",
+"Lesson plan purpose","ABCD objectives","ABCD objectives","ABCD objectives","ABCD objectives","Terminal & enabling objectives","Terminal & enabling objectives","Lesson plan components","Lesson plan components","Adapting lesson plans","Adapting lesson plans","Lesson plan components","Four-step method","Lesson plan components","Lesson plan components",
+"Media benefits","Media preparation","Media troubleshooting","LMS & records","Slide design","Video use","Social media policy","Simulation & role play","AV setup","AV setup","Handouts","Distance learning","Copyright law","Media selection","Visual tools",
+"Life Safety Initiatives","NFPA 1403 live fire","NFPA 1403 live fire","Safety officer","Role modeling","Hidden hazards","Rehab & wellness","Accident prevention","Equipment inspection","NFPA standards","Student safety duties","Accident investigation","Safety planning","Negligence & liability","Life Safety Initiatives",
+"Reliability & validity","Reliability & validity","Test types","Test item construction","Test item construction","Testing by domain","Testing by domain","Test administration","Test administration","Testing irregularities","Feedback delivery","Skills evaluation","Records & confidentiality","Evaluation purpose","Test item construction"
+];
+
+/* ===== V4: badges & bosses ===== */
+const ACH = [
+  ["jackpot", "High Roller", "Hit your first jackpot"],
+  ["hothand", "Hot Hand", "Reach combo ×4 (8 straight)"],
+  ["perfect", "Perfect Session", "100% on a full drill of 15+"],
+  ["streak7", "Week of Fire", "7-day study streak"],
+  ["leechslayer", "Leech Slayer", "Master a question that beat you 3+ times"],
+  ["centurion", "Centurion", "Finish a full 100-question exam sim"],
+  ["exampass", "Certified Dangerous", "Pass an exam sim at 70%+"],
+  ["all120", "The Full 120", "Master every question in the bank"]
+];
+function unlock(id, name) {
+  if (!db.badges) db.badges = {};
+  if (db.badges[id]) return;
+  db.badges[id] = Date.now();
+  saveDB();
+  sndRankUp(); confetti(80);
+  banner("BADGE EARNED: " + name, "+40 XP");
+  db.xp += 40; saveDB();
+}
+function startBoss(c) {
+  if (!confirm("Boss battle — Chapter " + c + ": " + CH_NAMES[c] + ". All 15 questions, need 13/15 (85%+) to take the badge. Ready?")) return;
+  const pool = QUESTIONS.map((q, i) => q.c === c ? i : -1).filter(i => i >= 0);
+  session = { mode: "boss", boss: c, list: shuffle(pool.slice()), pos: 0, right: 0, misses: [], answers: {}, combo: 0, endTime: null, timerId: null };
+  show("quiz");
+  document.getElementById("q-timer").classList.add("hidden");
+  renderQ();
+}
+function conceptStats() {
+  const map = {};
+  QUESTIONS.forEach((q, i) => {
+    const t = TAGS[i] || "Other";
+    if (!map[t]) map[t] = { a: 0, m: 0, n: 0 };
+    const s = qs(i);
+    map[t].a += s.a; map[t].m += s.m; map[t].n++;
+  });
+  return Object.keys(map).map(t => ({ tag: t, a: map[t].a, m: map[t].m, acc: map[t].a ? (map[t].a - map[t].m) / map[t].a : null }))
+    .filter(x => x.a >= 2 && x.acc !== null);
+}
+
+
 /* ---------- storage adapter ---------- */
 const store = {
   mode: null,
@@ -541,6 +625,8 @@ async function loadDB() {
   if (!db.hist) db.hist = [];
   if (typeof db.xp !== "number") db.xp = 0;
   if (typeof db.mute !== "boolean") db.mute = false;
+  if (!db.badges) db.badges = {};
+  if (!db.examDate) db.examDate = null;
   storageOK = store.mode !== "none";
 }
 
@@ -688,6 +774,52 @@ function renderHome() {
     return '<div class="listrow"><span style="color:var(--text)">' + q.q + '</span><br><small>Ch ' + q.c + ' · missed ' + s.m + ' of ' + s.a + ' · answer: ' + q.o[q.a] + '</small></div>';
   }).join("");
 
+  // countdown
+  const cdInput = document.getElementById("examdate");
+  if (db.examDate) cdInput.value = db.examDate;
+  const cdLine = document.getElementById("cd-line"), cdPace = document.getElementById("cd-pace");
+  if (db.examDate) {
+    const days = Math.ceil((new Date(db.examDate + "T09:00:00") - Date.now()) / DAY);
+    const unm = 120 - r.mastered;
+    if (days > 0) {
+      cdLine.textContent = days + " day" + (days === 1 ? "" : "s") + " to exam";
+      cdLine.style.color = days <= 3 ? "var(--red)" : days <= 7 ? "var(--trim)" : "var(--text)";
+      cdPace.textContent = unm === 0 ? "All 120 mastered — you're ready. Maintain with daily reviews." : "Master " + Math.ceil(unm / days) + " question" + (Math.ceil(unm / days) === 1 ? "" : "s") + "/day to have all 120 by exam day (" + unm + " to go).";
+    } else if (days === 0) { cdLine.textContent = "EXAM DAY"; cdLine.style.color = "var(--red)"; cdPace.textContent = "Light review only. Trust the work. 70% is the line — you've been training past it."; }
+    else { cdLine.textContent = "Exam date passed"; cdPace.textContent = "Set a new date if you're prepping for the next one."; }
+  }
+
+  // boss wall
+  const bw = document.getElementById("bosswall");
+  bw.innerHTML = "";
+  for (let c = 1; c <= 8; c++) {
+    const earned = db.badges["ch" + c];
+    const b = document.createElement("button");
+    b.className = "badge" + (earned ? " earned" : "");
+    b.innerHTML = '<div class="b-name">' + (earned ? "★ " : "") + 'Ch ' + c + ' Boss</div><div class="b-desc">' + CH_NAMES[c] + '</div><div class="b-cta">' + (earned ? "Won — refight" : "Fight") + '</div>';
+    b.onclick = () => startBoss(c);
+    bw.appendChild(b);
+  }
+  // achievements wall
+  const aw = document.getElementById("achwall");
+  aw.innerHTML = "";
+  ACH.forEach(a => {
+    const earned = db.badges[a[0]];
+    const d2 = document.createElement("div");
+    d2.className = "badge " + (earned ? "earned" : "locked");
+    d2.innerHTML = '<div class="b-name">' + (earned ? "★ " : "") + a[1] + '</div><div class="b-desc">' + a[2] + '</div>';
+    aw.appendChild(d2);
+  });
+
+  // weakest concepts
+  const cs = conceptStats().sort((x, y) => x.acc - y.acc).slice(0, 5);
+  const cEl = document.getElementById("concepts");
+  if (cs.length === 0) cEl.textContent = "Answer more questions to build your concept profile.";
+  else cEl.innerHTML = cs.map(x => {
+    const pct = Math.round(x.acc * 100);
+    return '<div class="chrow"><div class="chname" style="width:170px;">' + x.tag + '</div><div class="prog"><div style="width:' + pct + '%; background:' + (pct < 70 ? 'var(--red)' : 'var(--trim)') + '"></div></div><div class="chpct">' + pct + '%</div></div>';
+  }).join("");
+
   const missed = QUESTIONS.map((q, i) => ({ i, s: qs(i) })).filter(x => x.s.m > 0 && !isMastered(x.i))
     .sort((a, b) => missRate(b.i) - missRate(a.i) || b.s.m - a.s.m).slice(0, 5);
   const hl = document.getElementById("hitlist");
@@ -815,8 +947,11 @@ function answer(qi, oi, btn) {
     let gained = 10 * mult * (jack ? 3 : 1);
     const justMastered = s.s === MASTER_STREAK;
     if (justMastered) gained += 50;
-    if (jack) { sndJackpot(); confetti(45); buzz([40, 30, 80]); } else { sndCorrect(session.combo); buzz(20); }
+    if (jack) { sndJackpot(); confetti(45); buzz([40, 30, 80]); unlock("jackpot", "High Roller"); } else { sndCorrect(session.combo); buzz(20); }
     if (justMastered && !jack) fireworks(0.2, false);
+    if (session.combo >= 8) unlock("hothand", "Hot Hand");
+    if (justMastered && s.lap >= 3) unlock("leechslayer", "Leech Slayer");
+    if (justMastered && readiness().mastered === 120) unlock("all120", "The Full 120");
     awardXP(gained, rect.left + rect.width / 2, rect.top, jack);
     if (justMastered) { confetti(60); banner("MASTERED", "3 in a row. +50 XP bonus. It stays mastered until it beats you."); }
     fb.innerHTML = '<div class="feedback good"><strong>Correct' + (mult > 1 ? ' — combo ×' + mult : '') + (jack ? ' — JACKPOT ×3' : '') + '.</strong> ' + q.r + (justMastered ? ' <strong>Streak of ' + MASTER_STREAK + ' — mastered.</strong>' : ' Next review in ' + s.iv + ' day' + (s.iv === 1 ? '' : 's') + '.') + '</div>';
@@ -883,13 +1018,28 @@ function finish() {
     let bonus = 20;
     if (pctNow >= 85) bonus += 30;
     if (firstToday) bonus += 100;
+    if (session.mode === "boss" && answered === session.list.length && session.right >= 13) {
+      const key = "ch" + session.boss;
+      bonus += 150;
+      if (!db.badges[key]) { db.badges[key] = Date.now(); saveDB(); }
+      sndExamPass(); confetti(120);
+      banner("BOSS DOWN — CH " + session.boss + " BADGE", CH_NAMES[session.boss] + " · " + session.right + "/15 · +150 XP");
+      const allCh = [1,2,3,4,5,6,7,8].every(c => db.badges["ch" + c]);
+      if (allCh) setTimeout(() => banner("ALL 8 BADGES", "Every chapter boss is down. You are exam ready."), 2100);
+    } else if (session.mode === "boss" && answered === session.list.length) {
+      banner("BOSS SURVIVED — " + session.right + "/15", "Need 13/15. Study the misses below and refight.");
+    }
+    if (session.mode !== "exam" && session.mode !== "flash" && answered >= 15 && session.misses.length === 0) unlock("perfect", "Perfect Session");
+    if (session.mode === "exam" && answered === 100) unlock("centurion", "Centurion");
+    if (session.mode === "exam" && pctNow >= 70) unlock("exampass", "Certified Dangerous");
+    if (streakDays() >= 7) unlock("streak7", "Week of Fire");
     if (session.mode === "exam" && pctNow >= 70) { bonus += 200; confetti(140); sndExamPass(); banner("EXAM PASSED — " + pctNow + "%", "+200 XP. That's what test day is going to feel like."); }
     else if (pctNow >= 85) { confetti(70); banner("STRONG SESSION — " + pctNow + "%", firstToday ? "+" + bonus + " XP including daily bonus" : "+" + bonus + " XP"); }
     else if (firstToday) banner("DAILY BONUS", "+100 XP for showing up. The streak is the real win.");
     awardXP(bonus, window.innerWidth / 2, window.innerHeight * 0.35, false);
   }
   const exam = session.mode === "exam";
-  document.getElementById("d-title").textContent = exam ? "Exam results" : "Session complete";
+  document.getElementById("d-title").textContent = exam ? "Exam results" : (session.mode === "boss" ? "Boss battle — Chapter " + session.boss : "Session complete");
   const pct = answered === 0 ? 0 : Math.round(session.right / answered * 100);
   const v = document.getElementById("d-verdict");
   if (exam && answered > 0) {
@@ -947,13 +1097,22 @@ function claudeReport() {
     idxs.forEach(i => { att += qs(i).a; mis += qs(i).m; });
     lines.push("Ch " + c + " (" + CH_NAMES[c] + "): " + m + "/" + idxs.length + " mastered, accuracy " + (att ? Math.round((att - mis) / att * 100) + "%" : "n/a"));
   }
+  const cs = conceptStats().sort((x, y) => x.acc - y.acc).slice(0, 8);
+  if (cs.length) {
+    lines.push("");
+    lines.push("WEAKEST CONCEPTS (accuracy):");
+    cs.forEach(x => lines.push("- " + x.tag + ": " + Math.round(x.acc * 100) + "% (" + (x.a - x.m) + "/" + x.a + ")"));
+  }
+  const bossWon = [1,2,3,4,5,6,7,8].filter(c => db.badges && db.badges["ch" + c]);
+  lines.push("");
+  lines.push("CHAPTER BOSS BADGES WON: " + (bossWon.length ? bossWon.map(c => "Ch" + c).join(", ") : "none yet") + " (" + bossWon.length + "/8)");
   const worst = QUESTIONS.map((q, i) => ({ i, s: qs(i) })).filter(x => x.s.m > 0 && !isMastered(x.i))
     .sort((a, b) => missRate(b.i) - missRate(a.i) || b.s.m - a.s.m).slice(0, 10);
   lines.push("");
   lines.push("MY WORST QUESTIONS (please re-teach these topics):");
   worst.forEach(x => {
     const q = QUESTIONS[x.i];
-    lines.push("- [Ch " + q.c + "] \"" + q.q + "\" — missed " + x.s.m + "/" + x.s.a + (isLeech(x.i) ? " (LEECH)" : ""));
+    lines.push("- [Ch " + q.c + " / " + (TAGS[x.i] || "") + "] \"" + q.q + "\" — missed " + x.s.m + "/" + x.s.a + (isLeech(x.i) ? " (LEECH)" : ""));
   });
   const exams = db.hist.filter(h => h.mode === "exam");
   if (exams.length) {
@@ -1003,6 +1162,11 @@ async function resetAll() {
   renderHome();
 }
 
+document.getElementById("examdate").addEventListener("change", function () {
+  db.examDate = this.value || null;
+  saveDB();
+  renderHome();
+});
 document.getElementById("chsel").addEventListener("change", function () {
   const v = parseInt(this.value, 10);
   if (v >= 1) { startSession(v); this.value = "0"; }
