@@ -302,10 +302,33 @@ const RANKS = [
 const JACKPOT_CHANCE = 0.06;
 
 let AC = null;
+function ensureAC() {
+  if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+  if (AC.state === "suspended") AC.resume();
+  return AC;
+}
+// iOS unlock: create + resume the audio engine on the very first touch
+(function () {
+  const unlock = function () {
+    try {
+      ensureAC();
+      // play a silent blip inside the gesture to fully unlock iOS audio
+      const o = AC.createOscillator(), g = AC.createGain();
+      g.gain.value = 0.0001;
+      o.connect(g); g.connect(AC.destination);
+      o.start(); o.stop(AC.currentTime + 0.03);
+    } catch (e) {}
+    document.removeEventListener("touchend", unlock);
+    document.removeEventListener("click", unlock);
+  };
+  document.addEventListener("touchend", unlock, { passive: true });
+  document.addEventListener("click", unlock);
+})();
 function tone(freq, dur, delay, type, vol) {
   if (db.mute) return;
   try {
-    if (!AC) AC = new (window.AudioContext || window.webkitAudioContext)();
+    ensureAC();
+    if (AC.state === "suspended") return;
     const t = AC.currentTime + (delay || 0);
     const o = AC.createOscillator(), g = AC.createGain();
     o.type = type || "sine"; o.frequency.value = freq;
@@ -577,7 +600,7 @@ function renderHome() {
   if (leechIdx.length === 0) lEl.textContent = "None yet. Leeches are questions that keep beating you — they need re-teaching, not just repetition.";
   else lEl.innerHTML = leechIdx.slice(0, 6).map(i => {
     const q = QUESTIONS[i], s = qs(i);
-    return '<div class="listrow"><span style="color:var(--text)">' + q.q + '</span><br><small>Ch ' + q.c + ' · missed ' + s.m + ' of ' + s.a + ' · answer: ' + LETTERS[q.a] + '</small></div>';
+    return '<div class="listrow"><span style="color:var(--text)">' + q.q + '</span><br><small>Ch ' + q.c + ' · missed ' + s.m + ' of ' + s.a + ' · answer: ' + q.o[q.a] + '</small></div>';
   }).join("");
 
   const missed = QUESTIONS.map((q, i) => ({ i, s: qs(i) })).filter(x => x.s.m > 0 && !isMastered(x.i))
@@ -669,11 +692,13 @@ function renderQ() {
   document.getElementById("q-next-row").classList.add("hidden");
   const opts = document.getElementById("q-opts");
   opts.innerHTML = "";
-  q.o.forEach((opt, oi) => {
+  const perm = shuffle([0, 1, 2, 3]);
+  session.perm = perm;
+  perm.forEach((origIdx, displayPos) => {
     const b = document.createElement("button");
     b.className = "opt";
-    b.innerHTML = '<span class="letter">' + LETTERS[oi] + '</span>' + opt;
-    b.onclick = () => answer(qi, oi, b);
+    b.innerHTML = '<span class="letter">' + LETTERS[displayPos] + '</span>' + q.o[origIdx];
+    b.onclick = () => answer(qi, origIdx, b);
     opts.appendChild(b);
   });
 }
@@ -693,7 +718,8 @@ function answer(qi, oi, btn) {
     setTimeout(nextQ, 250); // auto-advance, no feedback
     return;
   }
-  buttons.forEach((b, bi) => { if (bi === q.a) b.classList.add("correct"); });
+  const correctPos = session.perm.indexOf(q.a);
+  buttons.forEach((b, bi) => { if (bi === correctPos) b.classList.add("correct"); });
   const fb = document.getElementById("q-fb");
   const s = qs(qi);
   const rect = btn.getBoundingClientRect();
@@ -714,7 +740,7 @@ function answer(qi, oi, btn) {
     btn.classList.add("wrong");
     document.querySelector("#quiz .card").classList.add("shake");
     setTimeout(() => document.querySelector("#quiz .card").classList.remove("shake"), 350);
-    fb.innerHTML = '<div class="feedback bad"><strong>Not quite — the answer is ' + LETTERS[q.a] + '.</strong> ' + q.r + ' Combo lost — back in rotation immediately.</div>';
+    fb.innerHTML = '<div class="feedback bad"><strong>Not quite — the answer is ' + LETTERS[session.perm.indexOf(q.a)] + ': ' + q.o[q.a] + '.</strong> ' + q.r + ' Combo lost — back in rotation immediately.</div>';
   }
   updateCombo();
   document.getElementById("q-score").textContent = session.right + " correct";
@@ -743,7 +769,7 @@ function renderFlash() {
 }
 function flashReveal() {
   const q = QUESTIONS[session.list[session.pos]];
-  document.getElementById("f-answer-text").innerHTML = '<strong>' + LETTERS[q.a] + '. ' + q.o[q.a] + '</strong><br><span style="color:var(--dim); font-size:13px;">' + q.r + '</span>';
+  document.getElementById("f-answer-text").innerHTML = '<strong>' + q.o[q.a] + '</strong><br><span style="color:var(--dim); font-size:13px;">' + q.r + '</span>';
   document.getElementById("f-answer").classList.remove("hidden");
   document.getElementById("f-reveal-row").classList.add("hidden");
 }
@@ -813,7 +839,7 @@ function finish() {
     mc.classList.remove("hidden");
     document.getElementById("d-misses").innerHTML = session.misses.map(qi => {
       const q = QUESTIONS[qi];
-      return '<div class="listrow">' + q.q + '<br><small>Answer: <strong style="color:var(--text)">' + LETTERS[q.a] + '</strong> — ' + q.r + ' <em>(Ch ' + q.c + ')</em></small></div>';
+      return '<div class="listrow">' + q.q + '<br><small>Answer: <strong style="color:var(--text)">' + q.o[q.a] + '</strong> — ' + q.r + ' <em>(Ch ' + q.c + ')</em></small></div>';
     }).join("");
   }
 }
