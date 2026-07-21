@@ -1,4 +1,4 @@
-const CACHE = "drillmaster-v10-6";
+const CACHE = "drillmaster-v10-7";
 const ASSETS = ["./index.html", "./manifest.webmanifest", "./icon-180.png", "./icon-512.png"];
 self.addEventListener("install", e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
